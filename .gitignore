@@ -1,0 +1,24 @@
+# Downloaded chat data — never commit
+teams_backup/
+
+# Python virtual environment
+.venv/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# macOS
+.DS_Store
+
+# IDE
+.idea/
+.vscode/
+
+# Archives (may contain chat data)
+*.zip
+*.tar.gz
+
+# Environment files (in case someone stores the token here)
+.env
+*.env
