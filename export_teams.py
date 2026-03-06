@@ -42,6 +42,14 @@ from urllib.parse import quote
 
 import requests
 
+# Chat names and message content can contain any Unicode character.
+# Force stdout/stderr to UTF-8 so printing them never raises UnicodeEncodeError
+# (terminals on some systems default to latin-1).
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
 OUTPUT_DIR = Path("teams_backup")
 
 # Conversation ID suffixes that indicate team channels — skip these
