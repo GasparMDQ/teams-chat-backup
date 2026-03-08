@@ -1,5 +1,6 @@
 # Downloaded chat data — never commit
 teams_backup/
+teams_backup*/
 
 # Python virtual environment
 .venv/
