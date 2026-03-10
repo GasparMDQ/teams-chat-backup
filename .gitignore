@@ -22,3 +22,6 @@ __pycache__/
 # Environment files (in case someone stores the token here)
 .env
 *.env
+
+# Visual brainstorming companion
+.superpowers/
