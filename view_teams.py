@@ -1,6 +1,9 @@
 import json
 import re
 import datetime
+import argparse
+import webbrowser
+import sys
 from pathlib import Path
 from html.parser import HTMLParser
 from collections import Counter
@@ -588,3 +591,42 @@ def generate_viewer(backup_dir: Path, output_path: Path) -> None:
     data_js = json.dumps(payload, ensure_ascii=False)
     html = _TEMPLATE.replace("__TEAMS_DATA__", data_js)
     Path(output_path).write_text(html, encoding="utf-8")
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(
+        description="Browse your Teams chat backup in a browser."
+    )
+    parser.add_argument(
+        "--dir",
+        type=Path,
+        default=Path("teams_backup"),
+        help="Path to the teams_backup directory (default: ./teams_backup)",
+    )
+    parser.add_argument(
+        "--output",
+        type=Path,
+        default=Path("teams_viewer.html"),
+        help="Output HTML file path (default: ./teams_viewer.html)",
+    )
+    parser.add_argument(
+        "--no-open",
+        action="store_true",
+        help="Generate the file without opening the browser",
+    )
+    args = parser.parse_args()
+
+    if not args.dir.exists():
+        print(f"Error: backup directory not found: {args.dir}", file=sys.stderr)
+        sys.exit(1)
+
+    print(f"Reading chats from {args.dir}...")
+    generate_viewer(args.dir, args.output)
+    print(f"Viewer written to {args.output.resolve()}")
+
+    if not args.no_open:
+        webbrowser.open(args.output.resolve().as_uri())
+
+
+if __name__ == "__main__":
+    main()
