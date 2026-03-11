@@ -44,7 +44,22 @@ def folder_display_name(folder_name: str) -> str:
     )
 
 
-def load_chats(backup_dir: Path) -> list:
+def chat_display_name(raw_name: str, user_name: str = "") -> str:
+    """Convert a folder-derived name to a human-readable chat title.
+
+    - Replaces underscore separators with ', '
+    - Optionally removes the user's own name from the participant list
+    """
+    name = re.sub(r'\s*_\s*', ', ', raw_name)
+    if user_name:
+        parts = [p.strip() for p in name.split(", ") if p.strip()]
+        filtered = [p for p in parts if p.lower() != user_name.strip().lower()]
+        if filtered:
+            name = ", ".join(filtered)
+    return name.strip(", ").strip()
+
+
+def load_chats(backup_dir: Path, user_name: str = "") -> list:
     chats = []
     backup_dir = Path(backup_dir)
     for messages_file in sorted(backup_dir.glob("*/messages.json")):
@@ -73,13 +88,13 @@ def load_chats(backup_dir: Path) -> list:
 
         chats.append({
             "id": folder.name,
-            "name": folder_display_name(folder.name),
+            "name": chat_display_name(folder_display_name(folder.name), user_name),
             "message_count": len(messages),
             "since": since,
             "messages": messages,
         })
 
-    chats.sort(key=lambda c: c["message_count"], reverse=True)
+    chats.sort(key=lambda c: c["name"].lower())
     return chats
 
 
@@ -333,6 +348,10 @@ _TEMPLATE = """<!DOCTYPE html>
     .res-snippet { font-size: 13px; line-height: 1.4; }
     .no-results { color: var(--muted); text-align: center; padding: 40px 0; }
     mark { background: var(--mark-bg); border-radius: 2px; padding: 0 1px; }
+    .msg-group.msg-highlighted > .msg-bubble {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
   </style>
 </head>
 <body>
@@ -362,6 +381,7 @@ _TEMPLATE = """<!DOCTYPE html>
 const DATA = __TEAMS_DATA__;
 
 let activeChatId = null;
+let highlightedEl = null;
 
 function fmt(iso) {
   if (!iso) return '';
@@ -431,6 +451,10 @@ function renderSidebar(query) {
 
 function openChat(id) {
   activeChatId = id;
+  if (highlightedEl) {
+    highlightedEl.classList.remove('msg-highlighted');
+    highlightedEl = null;
+  }
   document.getElementById('search').value = '';
   renderSidebar('');
 
@@ -473,10 +497,16 @@ function openChat(id) {
 }
 
 function scrollToMessage(time) {
+  if (highlightedEl) {
+    highlightedEl.classList.remove('msg-highlighted');
+    highlightedEl = null;
+  }
   const groups = document.querySelectorAll('.msg-group');
   for (const el of groups) {
     if (el.dataset.msgTime === time) {
       el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      el.classList.add('msg-highlighted');
+      highlightedEl = el;
       break;
     }
   }
@@ -580,9 +610,9 @@ function toggleTheme() {
 </html>"""
 
 
-def generate_viewer(backup_dir: Path, output_path: Path) -> None:
-    chats = load_chats(Path(backup_dir))
-    self_name = detect_self(chats)
+def generate_viewer(backup_dir: Path, output_path: Path, user_name: str = "") -> None:
+    chats = load_chats(Path(backup_dir), user_name)
+    self_name = user_name or detect_self(chats)
     payload = {
         "generated_at": datetime.datetime.now().isoformat(),
         "self": self_name or "",
@@ -614,6 +644,11 @@ def main() -> None:
         action="store_true",
         help="Generate the file without opening the browser",
     )
+    parser.add_argument(
+        "--name",
+        default="",
+        help="Your display name (e.g. 'Jane Smith') — filters it from chat titles and marks your messages",
+    )
     args = parser.parse_args()
 
     if not args.dir.exists():
@@ -621,7 +656,7 @@ def main() -> None:
         sys.exit(1)
 
     print(f"Reading chats from {args.dir}...")
-    generate_viewer(args.dir, args.output)
+    generate_viewer(args.dir, args.output, user_name=args.name)
     print(f"Viewer written to {args.output.resolve()}")
 
     if not args.no_open:

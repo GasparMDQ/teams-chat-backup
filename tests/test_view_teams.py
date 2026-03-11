@@ -1,7 +1,7 @@
 import json
 import pytest
 from pathlib import Path
-from view_teams import strip_html, load_chats, detect_self, folder_display_name, generate_viewer
+from view_teams import strip_html, load_chats, detect_self, folder_display_name, chat_display_name, generate_viewer
 
 
 def test_strip_html_removes_tags():
@@ -42,7 +42,9 @@ def test_load_chats_reads_messages(tmp_path):
 
     assert len(chats) == 1
     chat = chats[0]
-    assert chat["name"] == "Alice Smith_abc123thread_v2"
+    # folder_display_name doesn't strip this suffix (no regex match), so
+    # chat_display_name replaces the underscores with ', '
+    assert chat["name"] == "Alice Smith, abc123thread, v2"
     assert chat["message_count"] == 1
     assert chat["messages"][0]["sender"] == "Alice Smith"
     assert chat["messages"][0]["html"] == "<p>Hello!</p>"
@@ -55,9 +57,10 @@ def test_load_chats_skips_folders_without_messages_json(tmp_path):
     assert load_chats(tmp_path) == []
 
 
-def test_load_chats_sorts_by_message_count(tmp_path):
-    for name, count in [("Chat_A_id1", 1), ("Chat_B_id2", 5), ("Chat_C_id3", 3)]:
-        d = tmp_path / name
+def test_load_chats_sorts_alphabetically(tmp_path):
+    for name in [("Zebra_q_gbl_spaces", 5), ("Apple_q_gbl_spaces", 1), ("Mango_q_gbl_spaces", 3)]:
+        folder_name, count = name
+        d = tmp_path / folder_name
         d.mkdir()
         msgs = [
             {
@@ -71,7 +74,7 @@ def test_load_chats_sorts_by_message_count(tmp_path):
         (d / "messages.json").write_text(json.dumps({"conversation": {"id": "19:x"}, "messages": msgs}))
 
     chats = load_chats(tmp_path)
-    assert [c["message_count"] for c in chats] == [5, 3, 1]
+    assert [c["name"] for c in chats] == ["Apple", "Mango", "Zebra"]
 
 
 def test_load_chats_since_is_earliest_message(tmp_path):
@@ -111,6 +114,42 @@ def test_folder_display_name_strips_thread_v2():
 
 def test_folder_display_name_leaves_unrecognised_unchanged():
     assert folder_display_name("some_folder_name") == "some_folder_name"
+
+
+def test_chat_display_name_replaces_underscores():
+    assert chat_display_name("Alice_ Bob") == "Alice, Bob"
+
+
+def test_chat_display_name_filters_user_name():
+    assert chat_display_name("Gaspar Zaragoza_ Tony Hill", "Gaspar Zaragoza") == "Tony Hill"
+
+
+def test_chat_display_name_filters_user_name_at_end():
+    assert chat_display_name("Tony Hill_ Gaspar Zaragoza", "Gaspar Zaragoza") == "Tony Hill"
+
+
+def test_chat_display_name_filters_user_name_in_group():
+    assert chat_display_name("Alice_ Gaspar Zaragoza_ Bob", "Gaspar Zaragoza") == "Alice, Bob"
+
+
+def test_chat_display_name_no_user_name_just_replaces_underscores():
+    assert chat_display_name("Alice_ Bob_ Carol") == "Alice, Bob, Carol"
+
+
+def test_chat_display_name_preserves_name_if_only_participant():
+    # If filtering would leave an empty name, keep original
+    assert chat_display_name("Gaspar Zaragoza", "Gaspar Zaragoza") == "Gaspar Zaragoza"
+
+
+def test_load_chats_sorted_alphabetically(tmp_path):
+    for name in ["Zebra Chat_q_gbl_spaces", "Apple Chat_q_gbl_spaces", "Mango Chat_q_gbl_spaces"]:
+        d = tmp_path / name
+        d.mkdir()
+        msgs = [{"messagetype": "RichText/Html", "imdisplayname": "X",
+                  "composetime": "2024-01-01T00:00:00.000Z", "content": "<p>hi</p>"}]
+        (d / "messages.json").write_text(json.dumps({"conversation": {"id": "19:x"}, "messages": msgs}))
+    chats = load_chats(tmp_path)
+    assert [c["name"] for c in chats] == ["Apple Chat", "Mango Chat", "Zebra Chat"]
 
 
 def test_generate_viewer_creates_file(tmp_path):
