@@ -1,7 +1,7 @@
 import json
 import pytest
 from pathlib import Path
-from view_teams import strip_html, load_chats, detect_self
+from view_teams import strip_html, load_chats, detect_self, folder_display_name, generate_viewer
 
 
 def test_strip_html_removes_tags():
@@ -99,3 +99,73 @@ def test_detect_self_returns_most_common_sender(tmp_path):
 
 def test_detect_self_empty():
     assert detect_self([]) is None
+
+
+def test_folder_display_name_strips_gbl_spaces():
+    assert folder_display_name("Alice Smith_q_gbl_spaces") == "Alice Smith"
+
+
+def test_folder_display_name_strips_thread_v2():
+    assert folder_display_name("Project Team_81_thread_v2") == "Project Team"
+
+
+def test_folder_display_name_leaves_unrecognised_unchanged():
+    assert folder_display_name("some_folder_name") == "some_folder_name"
+
+
+def test_generate_viewer_creates_file(tmp_path):
+    backup = tmp_path / "backup"
+    backup.mkdir()
+    d = backup / "Alice_q_gbl_spaces"
+    d.mkdir()
+    msgs = [{"messagetype": "RichText/Html", "imdisplayname": "Alice",
+              "composetime": "2024-01-01T10:00:00.000Z", "content": "<p>Hi</p>"}]
+    (d / "messages.json").write_text(
+        json.dumps({"conversation": {"id": "19:x"}, "messages": msgs})
+    )
+    out = tmp_path / "viewer.html"
+    generate_viewer(backup, out)
+    assert out.exists()
+
+
+def test_generate_viewer_embeds_sender_name(tmp_path):
+    backup = tmp_path / "backup"
+    backup.mkdir()
+    d = backup / "Alice_q_gbl_spaces"
+    d.mkdir()
+    msgs = [{"messagetype": "RichText/Html", "imdisplayname": "Alice",
+              "composetime": "2024-01-01T10:00:00.000Z", "content": "<p>Hi</p>"}]
+    (d / "messages.json").write_text(
+        json.dumps({"conversation": {"id": "19:x"}, "messages": msgs})
+    )
+    out = tmp_path / "viewer.html"
+    generate_viewer(backup, out)
+    content = out.read_text()
+    # load_chats maps imdisplayname -> sender; check key+value in serialised JSON
+    assert '"sender": "Alice"' in content
+    # load_chats maps content -> html; check raw HTML value in JSON
+    assert '"html": "<p>Hi</p>"' in content
+    # load_chats strips HTML for the text field used by search
+    assert '"text": "Hi"' in content
+
+
+def test_generate_viewer_is_valid_html(tmp_path):
+    backup = tmp_path / "backup"
+    backup.mkdir()
+    out = tmp_path / "viewer.html"
+    generate_viewer(backup, out)
+    content = out.read_text()
+    assert content.startswith("<!DOCTYPE html>")
+    assert "</html>" in content
+
+
+def test_generate_viewer_contains_app_scaffold(tmp_path):
+    backup = tmp_path / "backup"
+    backup.mkdir()
+    out = tmp_path / "viewer.html"
+    generate_viewer(backup, out)
+    content = out.read_text()
+    assert 'id="app"' in content
+    assert 'id="sidebar"' in content
+    assert 'id="messages"' in content
+    assert 'id="search"' in content
