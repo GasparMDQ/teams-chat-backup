@@ -116,6 +116,30 @@ teams_backup/
 
 ---
 
+## Viewing your backup
+
+```bash
+python view_teams.py
+```
+
+Generates `teams_viewer.html` and opens it in your default browser. Features:
+
+- Sidebar listing all chats sorted by message count
+- Unified search across chat names and message content
+- Light/dark theme toggle (preference saved across sessions)
+
+To regenerate after a new backup run, just run the command again.
+
+**Options:**
+
+| Flag | Default | Description |
+|---|---|---|
+| `--dir PATH` | `./teams_backup` | Backup directory to read |
+| `--output PATH` | `./teams_viewer.html` | Output file path |
+| `--no-open` | — | Generate without opening browser |
+
+---
+
 ## Troubleshooting
 
 | Error | Fix |
